@@ -5,38 +5,31 @@ const fetch = require('node-fetch');
 const crypto = require('crypto');
 
 // Helper function to construct the KHQR string
-// This is based on the official Bakong/KHQR documentation standards.
 const createKhqrString = (merchantInfo, amount, billNumber) => {
     const formatTag = (id, value) => {
         const len = String(value).length.toString().padStart(2, '0');
         return `${id}${len}${value}`;
     };
 
-    // Static parts of the QR string
     const payloadFormat = formatTag('00', '01');
     const pointOfInitiation = formatTag('01', '12'); // 12 for dynamic QR
     
-    // Merchant Information (Tag 29 for Bakong)
     const guid = formatTag('00', 'kh.com.nbc.bakong');
-    const merchantId = formatTag('01', merchantInfo.id); // Your Bakong Account ID
+    const merchantId = formatTag('01', merchantInfo.id);
     const merchantNameTag = formatTag('02', merchantInfo.name);
     const merchantInfoTag = formatTag('29', `${guid}${merchantId}${merchantNameTag}`);
 
-    const merchantCategoryCode = formatTag('52', '5499'); // General Retail
-    const currencyCode = formatTag('53', '840'); // 840 for USD
+    const merchantCategoryCode = formatTag('52', '5499');
+    const currencyCode = formatTag('53', '840'); // USD
     const amountTag = formatTag('54', amount.toFixed(2));
     const countryCode = formatTag('58', 'KH');
     const merchantCity = formatTag('60', 'Siem Reap');
 
-    // Additional Data (Tag 62) for Bill Number
     const billNumberTag = formatTag('01', billNumber);
     const additionalData = formatTag('62', billNumberTag);
 
-    // Combine all parts
     const combined = `${payloadFormat}${pointOfInitiation}${merchantInfoTag}${merchantCategoryCode}${currencyCode}${amountTag}${countryCode}${merchantCity}${additionalData}6304`;
     
-    // Calculate CRC checksum
-    // This is a standard algorithm for QR codes
     let crc = 0xFFFF;
     for (let i = 0; i < combined.length; i++) {
         crc ^= combined.charCodeAt(i) << 8;
@@ -55,7 +48,8 @@ exports.handler = async (event) => {
         return { statusCode: 405, body: JSON.stringify({ message: 'Method Not Allowed' }) };
     }
 
-    const { BAKONG_API_TOKEN, BAKONG_MERCHANT_ID, BAKONG_MERCHANT_NAME } = process.env;
+    // URL is a built-in Netlify environment variable containing the site's primary URL.
+    const { BAKONG_API_TOKEN, BAKONG_MERCHANT_ID, BAKONG_MERCHANT_NAME, URL } = process.env;
 
     if (!BAKONG_API_TOKEN || !BAKONG_MERCHANT_ID || !BAKONG_MERCHANT_NAME) {
         return { statusCode: 500, body: JSON.stringify({ message: 'Bakong API credentials are not configured on the server.' }) };
@@ -68,23 +62,14 @@ exports.handler = async (event) => {
             return { statusCode: 400, body: JSON.stringify({ message: 'Invalid payment amount.' }) };
         }
 
-        const merchantInfo = {
-            id: BAKONG_MERCHANT_ID,
-            name: BAKONG_MERCHANT_NAME,
-        };
-
-        // 1. Generate the KHQR string
+        const merchantInfo = { id: BAKONG_MERCHANT_ID, name: BAKONG_MERCHANT_NAME };
         const qrCodeString = createKhqrString(merchantInfo, amount, billNumber);
-
-        // 2. Create an MD5 hash of the QR string to check payment status later
         const md5 = crypto.createHash('md5').update(qrCodeString).digest('hex');
 
-        // 3. Handle mobile vs. desktop
         if (isMobile) {
-            // For mobile, we need to get a deep-link from the Bakong API
             const bakongApiUrl = 'https://api-bakong.nbc.gov.kh/v1/generate_deeplink_by_qr';
             
-            const response = await fetch(bakongApiUrl, {
+            const apiResponse = await fetch(bakongApiUrl, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -92,16 +77,28 @@ exports.handler = async (event) => {
                 },
                 body: JSON.stringify({
                     qr: qrCodeString,
-                    // The callback is where the user is sent after payment.
-                    // IMPORTANT: You might need to create a specific "thank you" page on your site.
                     "sourceInfo": {
-                        "appDeepLinkCallback": "https://your-site-name.netlify.app/" // Replace with your site URL
+                        // FIX: Added appName and appIconUrl which are required by the Bakong API for deep-links.
+                        "appName": "PsygerHub Shop",
+                        "appIconUrl": "https://placehold.co/100x100/7c3aed/ffffff?text=P", // A placeholder icon
+                        "appDeepLinkCallback": URL 
                     }
                 }),
             });
 
-            const result = await response.json();
+            // Check if the response is JSON before trying to parse it
+            const responseText = await apiResponse.text();
+            let result;
+            try {
+                result = JSON.parse(responseText);
+            } catch (e) {
+                // If parsing fails, it means Bakong sent an HTML error page.
+                console.error("Bakong API did not return JSON. Response:", responseText);
+                throw new Error("Bakong API returned an unexpected response. Please check your API Token.");
+            }
+
             if (result.responseCode !== 0) {
+                console.error("Bakong API Error:", result.responseMessage);
                 throw new Error(result.responseMessage || 'Failed to generate Bakong deep-link.');
             }
 
@@ -111,7 +108,7 @@ exports.handler = async (event) => {
             };
 
         } else {
-            // For desktop, we just return the QR string and the MD5 hash
+            // Desktop flow remains the same
             return {
                 statusCode: 200,
                 body: JSON.stringify({ qrCode: qrCodeString, md5: md5 }),
@@ -119,7 +116,7 @@ exports.handler = async (event) => {
         }
 
     } catch (error) {
-        console.error('Bakong API Error:', error);
+        console.error('Bakong API process failed:', error);
         return { statusCode: 500, body: JSON.stringify({ message: `Error communicating with Bakong API: ${error.message}` }) };
     }
 };
