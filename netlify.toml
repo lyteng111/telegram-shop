@@ -1,0 +1,22 @@
+# This file configures the build and development settings for Netlify.
+
+[build]
+  # Command to build the React frontend and Tailwind CSS
+  command = "npm run build"
+  # Directory where the serverless functions are located
+  functions = ".netlify/functions/"
+  # The directory that contains the built frontend to be published
+  publish = "build/"
+
+# Settings for the local development server (netlify dev)
+[dev]
+  # The command to start the frontend development server
+  command = "npm start"
+  # The port for the frontend server
+  port = 3005
+  # The port where the Netlify Dev server will run, proxying everything
+  targetPort = 8888
+  # The directory to publish in the dev environment
+  publish = "build"
+  # This makes sure your environment variables from the .env file are loaded
+  framework = "#custom"
