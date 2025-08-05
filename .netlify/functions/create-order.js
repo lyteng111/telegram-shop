@@ -46,7 +46,7 @@ exports.handler = async (event) => {
         }
 
         const formatDeliveryMethod = (method) => ({'in_siem_reap': 'In Siem Reap', 'virak_buntham': 'Virak Buntham', 'j_and_t': 'J&T Express'}[method] || method);
-        const formatPaymentMethod = (method) => ({'cash_on_delivery': 'Cash on Delivery', 'aba_bank': 'ABA Bank Transfer'}[method] || method);
+        const formatPaymentMethod = (method) => ({'cash_on_delivery': 'Cash on Delivery', 'bakong_khqr': 'Bakong (KHQR)'}[method] || method);
 
         let adminMessage = `🚀 *New Order Received!* 🚀\n\n` +
                            `*Order ID:* \`${orderId}\`\n` +
@@ -72,8 +72,8 @@ exports.handler = async (event) => {
                                      `*Delivery Address:* ${customerInfo.address}\n\n` +
                                      `We will contact you shortly. Thank you!`;
 
-            if (paymentMethod === 'aba_bank') {
-                userInvoiceMessage += `\n\n*Important:* For ABA, please send a transaction screenshot to this chat.`;
+            if (paymentMethod === 'bakong_khqr') {
+                userInvoiceMessage += `\n\n*Important:* For your KHQR payment, please send a transaction screenshot to this chat to finalize your order.`;
             }
             await bot.sendMessage(customerTelegramUserId, userInvoiceMessage, { parse_mode: 'Markdown' });
         }
