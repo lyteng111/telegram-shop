@@ -1,9 +1,6 @@
-// This function contains the final fix for the Bakong Merchant ID.
-
 const fetch = require('node-fetch');
 const crypto = require('crypto');
 
-// Standard CRC-16/CCITT-FALSE checksum function used by KHQR
 const crc16 = (data) => {
     let crc = 0xFFFF;
     for (let i = 0; i < data.length; i++) {
@@ -51,15 +48,10 @@ exports.handler = async (event) => {
         return { statusCode: 500, body: JSON.stringify({ message: 'Bakong API credentials are not configured on the server.' }) };
     }
 
-    // --- FINAL FIX IS HERE ---
-    // This code checks if the merchant ID ends with the unofficial '@aclb'
-    // and replaces it with the official '@acledabank' for universal compatibility.
     let correctedMerchantId = BAKONG_MERCHANT_ID;
     if (correctedMerchantId.endsWith('@aclb')) {
         correctedMerchantId = correctedMerchantId.replace('@aclb', '@acledabank');
-        console.log(`Corrected ACLEDA merchant ID to: ${correctedMerchantId}`);
     }
-    // --- END OF FIX ---
 
     try {
         const { amount, isMobile, billNumber } = JSON.parse(event.body);
