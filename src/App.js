@@ -1,9 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import QRCode from 'react-qr-code';
 
-// --- HELPER HOOKS & COMPONENTS ---
-
-// Hook to detect if the user is on a mobile device
 const useIsMobile = () => {
   const [isMobile, setIsMobile] = useState(false);
   useEffect(() => {
@@ -14,7 +11,6 @@ const useIsMobile = () => {
   return isMobile;
 };
 
-// Reusable Button Component
 const Button = ({ children, onClick, className = '', disabled = false }) => (
   <button
     onClick={onClick}
@@ -25,7 +21,6 @@ const Button = ({ children, onClick, className = '', disabled = false }) => (
   </button>
 );
 
-// Payment Modal for Desktop QR Code
 const PaymentModal = ({ qrCode, amount, onCancel }) => (
   <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
     <div className="bg-white rounded-2xl shadow-2xl p-6 sm:p-8 text-center max-w-sm w-full">
@@ -42,9 +37,6 @@ const PaymentModal = ({ qrCode, amount, onCancel }) => (
     </div>
   </div>
 );
-
-
-// --- MAIN COMPONENTS ---
 
 const ProductCard = ({ product, onAddToCart }) => (
   <div className="bg-white p-6 rounded-2xl shadow-xl flex flex-col justify-between transition-all duration-300 hover:shadow-2xl hover:scale-[1.02] border border-gray-100">
@@ -64,18 +56,14 @@ const CheckoutPage = ({ cartItems, onRemoveFromCart, onUpdateQuantity, onCheckou
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('');
   const [notification, setNotification] = useState({ show: false, message: '', type: 'error' });
   const [isProcessing, setIsProcessing] = useState(false);
-  
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentData, setPaymentData] = useState({ qrCode: '', md5: '' });
-  
   const isMobile = useIsMobile();
   const pollingInterval = useRef(null);
 
   const countryCodes = [
     { code: '+855', name: 'KH', flag: '🇰🇭' }, { code: '+66', name: 'TH', flag: '🇹🇭' },
-    { code: '+84', name: 'VN', flag: '🇻🇳' }, { code: '+86', name: 'CN', flag: '🇨🇳' },
-    { code: '+81', name: 'JP', flag: '🇯🇵' }, { code: '+82', name: 'KR', flag: '🇰🇷' },
-    { code: '+1', name: 'US', flag: '🇺🇸' }, { code: '+44', name: 'UK', flag: '🇬🇧' },
+    { code: '+84', name: 'VN', flag: '🇻🇳' }
   ];
 
   const handleInputChange = (e) => {
@@ -297,7 +285,6 @@ const CheckoutPage = ({ cartItems, onRemoveFromCart, onUpdateQuantity, onCheckou
   );
 };
 
-// Main App Component
 const App = () => {
   const [products] = useState([
     { id: 1, name: 'Smartwatch Ultra 2', description: 'Next-gen health monitoring & GPS.', price: 0.01, imageUrl: 'https://i5.walmartimages.com/seo/Smart-Watch-Fits-for-Android-and-iPhone-EEEkit-Fitness-Health-Tracker-Waterproof-Smartwatch-for-Women-Men_819cb65b-8437-4eb3-aba1-ce6513dc8d58.312f5775b50ab18c130fe5a454149fa9.jpeg' },

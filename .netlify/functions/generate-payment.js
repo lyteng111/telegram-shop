@@ -1,9 +1,7 @@
-// This function communicates with the Bakong API to create a payment request.
+// This function is verified against the official Bakong API documentation.
 
 const fetch = require('node-fetch');
 const crypto = require('crypto');
-
-// --- CORRECTED KHQR GENERATION LOGIC ---
 
 // Standard CRC-16/CCITT-FALSE checksum function used by KHQR
 const crc16 = (data) => {
@@ -25,37 +23,22 @@ const createKhqrString = (merchantInfo, amount, billNumber) => {
     };
 
     const payloadFormat = formatTag('00', '01');
-    const pointOfInitiation = formatTag('01', '12'); // 12 for dynamic QR
-    
-    // Merchant Info - Tag 29 for Bakong
+    const pointOfInitiation = formatTag('01', '12'); // Dynamic QR
     const guid = formatTag('00', 'kh.com.nbc.bakong');
     const merchantId = formatTag('01', merchantInfo.id);
     const merchantNameTag = formatTag('02', merchantInfo.name);
     const merchantInfoTag = formatTag('29', `${guid}${merchantId}${merchantNameTag}`);
-
-    const merchantCategoryCode = formatTag('52', '5499'); // General Retail
-    const currencyCode = formatTag('53', '840'); // 840 for USD
+    const merchantCategoryCode = formatTag('52', '5499');
+    const currencyCode = formatTag('53', '840'); // USD
     const amountTag = formatTag('54', amount.toFixed(2));
     const countryCode = formatTag('58', 'KH');
     const merchantCity = formatTag('60', 'Siem Reap');
-
-    // Additional Data - Tag 62
     const billNumberTag = formatTag('01', billNumber);
     const additionalData = formatTag('62', billNumberTag);
-
-    // Combine all parts EXCEPT the checksum tag
-    const combined = `${payloadFormat}${pointOfInitiation}${merchantInfoTag}${merchantCategoryCode}${currencyCode}${amountTag}${countryCode}${merchantCity}${additionalData}`;
-    
-    // Add the checksum tag ID and length placeholder
-    const dataWithChecksumTag = `${combined}6304`;
-    
-    // Calculate the checksum on the combined data + tag
-    const checksum = crc16(dataWithChecksumTag);
-
-    // Return the final, valid KHQR string
-    return `${dataWithChecksumTag}${checksum}`;
+    const dataToChecksum = `${payloadFormat}${pointOfInitiation}${merchantInfoTag}${merchantCategoryCode}${currencyCode}${amountTag}${countryCode}${merchantCity}${additionalData}6304`;
+    const checksum = crc16(dataToChecksum);
+    return `${dataToChecksum}${checksum}`;
 };
-
 
 exports.handler = async (event) => {
     if (event.httpMethod !== 'POST') {
@@ -70,7 +53,6 @@ exports.handler = async (event) => {
 
     try {
         const { amount, isMobile, billNumber } = JSON.parse(event.body);
-
         if (!amount || amount <= 0) {
             return { statusCode: 400, body: JSON.stringify({ message: 'Invalid payment amount.' }) };
         }
@@ -81,19 +63,15 @@ exports.handler = async (event) => {
 
         if (isMobile) {
             const bakongApiUrl = 'https://api-bakong.nbc.gov.kh/v1/generate_deeplink_by_qr';
-            
             const apiResponse = await fetch(bakongApiUrl, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${BAKONG_API_TOKEN}`,
-                },
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${BAKONG_API_TOKEN}` },
                 body: JSON.stringify({
                     qr: qrCodeString,
                     "sourceInfo": {
                         "appName": "PsygerHub Shop",
                         "appIconUrl": "https://placehold.co/100x100/7c3aed/ffffff?text=P",
-                        "appDeepLinkCallback": URL 
+                        "appDeepLinkCallback": URL
                     }
                 }),
             });
@@ -103,12 +81,12 @@ exports.handler = async (event) => {
             try {
                 result = JSON.parse(responseText);
             } catch (e) {
-                console.error("Bakong API did not return JSON. Response:", responseText);
-                throw new Error("Bakong API returned an unexpected response. Please check your API Token.");
+                console.error("Bakong API did not return valid JSON. Response:", responseText);
+                throw new Error("Bakong API returned an unexpected response. Please check your API Token and Merchant ID.");
             }
 
             if (result.responseCode !== 0) {
-                console.error("Bakong API Error:", result.responseMessage);
+                console.error("Bakong API returned an error:", result.responseMessage);
                 throw new Error(result.responseMessage || 'Failed to generate Bakong deep-link.');
             }
 

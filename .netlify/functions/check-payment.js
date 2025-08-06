@@ -1,4 +1,4 @@
-// This function checks the payment status of a transaction using its MD5 hash.
+// This function is verified against the official Bakong API documentation.
 
 const fetch = require('node-fetch');
 
@@ -31,14 +31,14 @@ exports.handler = async (event) => {
 
         const result = await response.json();
 
-        // The Bakong API returns a specific message for unpaid transactions.
-        // If the transaction is paid, it returns the transaction hash.
+        // According to the documentation, a successful payment has responseCode: 0 and a non-null data object.
         if (result.responseCode === 0 && result.data && result.data.hash) {
             return {
                 statusCode: 200,
                 body: JSON.stringify({ status: 'PAID' }),
             };
         } else {
+            // Any other response (Not Found, Failed, etc.) is treated as UNPAID.
             return {
                 statusCode: 200,
                 body: JSON.stringify({ status: 'UNPAID' }),

@@ -7,19 +7,13 @@ exports.handler = async (event) => {
 
     if (!botToken || !adminChatId) {
         console.error('FATAL ERROR: Telegram environment variables are not set on Netlify.');
-        return {
-            statusCode: 500,
-            body: JSON.stringify({ message: 'Internal Server Configuration Error.' }),
-        };
+        return { statusCode: 500, body: JSON.stringify({ message: 'Internal Server Configuration Error.' }) };
     }
 
     const bot = new TelegramBot(botToken);
 
     if (event.httpMethod !== 'POST') {
-        return {
-            statusCode: 405,
-            body: JSON.stringify({ message: 'Method Not Allowed' }),
-        };
+        return { statusCode: 405, body: JSON.stringify({ message: 'Method Not Allowed' }) };
     }
 
     try {
@@ -27,22 +21,15 @@ exports.handler = async (event) => {
         const { customerInfo, items, total, deliveryMethod, paymentMethod, telegramInitData } = orderDetails;
 
         const orderId = `ORD-${Date.now()}`;
-        let customerTelegramUserId = null;
-        let customerUsername = 'N/A';
-        let customerFirstName = 'Customer';
+        let customerTelegramUserId = null, customerUsername = 'N/A', customerFirstName = 'Customer';
 
         if (telegramInitData) {
             try {
-                const parsedInitData = parse(telegramInitData);
-                if (parsedInitData.user) {
-                    const user = JSON.parse(parsedInitData.user);
-                    customerTelegramUserId = user.id;
-                    customerUsername = user.username || 'N/A';
-                    customerFirstName = user.first_name || 'Customer';
-                }
-            } catch (parseError) {
-                console.error('Could not parse telegramInitData:', parseError);
-            }
+                const user = JSON.parse(parse(telegramInitData).user);
+                customerTelegramUserId = user.id;
+                customerUsername = user.username || 'N/A';
+                customerFirstName = user.first_name || 'Customer';
+            } catch (e) { console.error('Could not parse telegramInitData:', e); }
         }
 
         const formatDeliveryMethod = (method) => ({'in_siem_reap': 'In Siem Reap', 'virak_buntham': 'Virak Buntham', 'j_and_t': 'J&T Express'}[method] || method);
@@ -71,23 +58,18 @@ exports.handler = async (event) => {
                                      `*Payment:* ${formatPaymentMethod(paymentMethod)}\n` +
                                      `*Delivery Address:* ${customerInfo.address}\n\n` +
                                      `We will contact you shortly. Thank you!`;
-
+            
             if (paymentMethod === 'bakong_khqr') {
-                userInvoiceMessage += `\n\n*Important:* For your KHQR payment, please send a transaction screenshot to this chat to finalize your order.`;
+                userInvoiceMessage += `\n\nYour payment has been successfully received.`;
             }
+
             await bot.sendMessage(customerTelegramUserId, userInvoiceMessage, { parse_mode: 'Markdown' });
         }
 
-        return {
-            statusCode: 200,
-            body: JSON.stringify({ message: 'Order received!', orderId }),
-        };
+        return { statusCode: 200, body: JSON.stringify({ message: 'Order received!', orderId }) };
 
     } catch (error) {
         console.error('Error processing order:', error);
-        return {
-            statusCode: 500,
-            body: JSON.stringify({ message: 'Failed to process order.', error: error.message }),
-        };
+        return { statusCode: 500, body: JSON.stringify({ message: 'Failed to process order.', error: error.message }) };
     }
 };
