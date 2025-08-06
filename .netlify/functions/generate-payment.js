@@ -1,4 +1,4 @@
-// This function is verified against the official Bakong API documentation.
+// This function contains the final fix for the Bakong Merchant ID.
 
 const fetch = require('node-fetch');
 const crypto = require('crypto');
@@ -23,13 +23,13 @@ const createKhqrString = (merchantInfo, amount, billNumber) => {
     };
 
     const payloadFormat = formatTag('00', '01');
-    const pointOfInitiation = formatTag('01', '12'); // Dynamic QR
+    const pointOfInitiation = formatTag('01', '12');
     const guid = formatTag('00', 'kh.com.nbc.bakong');
     const merchantId = formatTag('01', merchantInfo.id);
     const merchantNameTag = formatTag('02', merchantInfo.name);
     const merchantInfoTag = formatTag('29', `${guid}${merchantId}${merchantNameTag}`);
     const merchantCategoryCode = formatTag('52', '5499');
-    const currencyCode = formatTag('53', '840'); // USD
+    const currencyCode = formatTag('53', '840');
     const amountTag = formatTag('54', amount.toFixed(2));
     const countryCode = formatTag('58', 'KH');
     const merchantCity = formatTag('60', 'Siem Reap');
@@ -51,13 +51,23 @@ exports.handler = async (event) => {
         return { statusCode: 500, body: JSON.stringify({ message: 'Bakong API credentials are not configured on the server.' }) };
     }
 
+    // --- FINAL FIX IS HERE ---
+    // This code checks if the merchant ID ends with the unofficial '@aclb'
+    // and replaces it with the official '@acledabank' for universal compatibility.
+    let correctedMerchantId = BAKONG_MERCHANT_ID;
+    if (correctedMerchantId.endsWith('@aclb')) {
+        correctedMerchantId = correctedMerchantId.replace('@aclb', '@acledabank');
+        console.log(`Corrected ACLEDA merchant ID to: ${correctedMerchantId}`);
+    }
+    // --- END OF FIX ---
+
     try {
         const { amount, isMobile, billNumber } = JSON.parse(event.body);
         if (!amount || amount <= 0) {
             return { statusCode: 400, body: JSON.stringify({ message: 'Invalid payment amount.' }) };
         }
 
-        const merchantInfo = { id: BAKONG_MERCHANT_ID, name: BAKONG_MERCHANT_NAME };
+        const merchantInfo = { id: correctedMerchantId, name: BAKONG_MERCHANT_NAME };
         const qrCodeString = createKhqrString(merchantInfo, amount, billNumber);
         const md5 = crypto.createHash('md5').update(qrCodeString).digest('hex');
 
