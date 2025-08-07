@@ -1,15 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import QRCode from 'react-qr-code';
 
-const useIsMobile = () => {
-  const [isMobile, setIsMobile] = useState(false);
-  useEffect(() => {
-    const userAgent = typeof window.navigator === 'undefined' ? '' : navigator.userAgent;
-    const mobile = Boolean(/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent));
-    setIsMobile(mobile);
-  }, []);
-  return isMobile;
-};
+// --- HELPER COMPONENTS ---
 
 const Button = ({ children, onClick, className = '', disabled = false }) => (
   <button
@@ -38,6 +30,8 @@ const PaymentModal = ({ qrCode, amount, onCancel }) => (
   </div>
 );
 
+// --- MAIN COMPONENTS ---
+
 const ProductCard = ({ product, onAddToCart }) => (
   <div className="bg-white p-6 rounded-2xl shadow-xl flex flex-col justify-between transition-all duration-300 hover:shadow-2xl hover:scale-[1.02] border border-gray-100">
     <img src={product.imageUrl} alt={product.name} className="w-full h-48 object-cover rounded-lg mb-4 shadow-md" onError={(e) => { e.target.onerror = null; e.target.src = `https://placehold.co/400x300/e0f2fe/075985?text=${encodeURIComponent(product.name)}`}} />
@@ -56,9 +50,10 @@ const CheckoutPage = ({ cartItems, onRemoveFromCart, onUpdateQuantity, onCheckou
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('');
   const [notification, setNotification] = useState({ show: false, message: '', type: 'error' });
   const [isProcessing, setIsProcessing] = useState(false);
+  
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentData, setPaymentData] = useState({ qrCode: '', md5: '' });
-  const isMobile = useIsMobile();
+  
   const pollingInterval = useRef(null);
 
   const countryCodes = [
@@ -149,6 +144,7 @@ const CheckoutPage = ({ cartItems, onRemoveFromCart, onUpdateQuantity, onCheckou
       return;
     }
 
+    // --- Bakong Payment Flow (Always generate QR) ---
     setIsProcessing(true);
     try {
       const response = await fetch('/.netlify/functions/generate-payment', {
@@ -156,20 +152,17 @@ const CheckoutPage = ({ cartItems, onRemoveFromCart, onUpdateQuantity, onCheckou
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           amount: calculateTotal(),
-          isMobile: isMobile,
           billNumber: `ORD-${Date.now()}`
         }),
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.message);
 
-      if (isMobile) {
-        window.location.href = result.deepLink;
-      } else {
-        setPaymentData({ qrCode: result.qrCode, md5: result.md5 });
-        setShowPaymentModal(true);
-        pollForPaymentStatus(result.md5);
-      }
+      // Always show the QR code modal and start polling
+      setPaymentData({ qrCode: result.qrCode, md5: result.md5 });
+      setShowPaymentModal(true);
+      pollForPaymentStatus(result.md5);
+
     } catch (error) {
       console.error('Error generating payment:', error);
       showNotification(`Could not initiate Bakong payment: ${error.message}`);
