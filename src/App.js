@@ -144,7 +144,6 @@ const CheckoutPage = ({ cartItems, onRemoveFromCart, onUpdateQuantity, onCheckou
       return;
     }
 
-    // --- Bakong Payment Flow (Always generate QR) ---
     setIsProcessing(true);
     try {
       const response = await fetch('/.netlify/functions/generate-payment', {
@@ -158,7 +157,6 @@ const CheckoutPage = ({ cartItems, onRemoveFromCart, onUpdateQuantity, onCheckou
       const result = await response.json();
       if (!response.ok) throw new Error(result.message);
 
-      // Always show the QR code modal and start polling
       setPaymentData({ qrCode: result.qrCode, md5: result.md5 });
       setShowPaymentModal(true);
       pollForPaymentStatus(result.md5);
