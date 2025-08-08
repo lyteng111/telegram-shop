@@ -48,10 +48,8 @@ exports.handler = async (event) => {
         return { statusCode: 500, body: JSON.stringify({ message: 'Bakong API credentials are not configured on the server.' }) };
     }
 
-    let correctedMerchantId = BAKONG_MERCHANT_ID;
-    if (correctedMerchantId.endsWith('@aclb')) {
-        correctedMerchantId = correctedMerchantId.replace('@aclb', '@acledabank');
-    }
+    // This is the variable that will be used, without the incorrect modification.
+    const correctedMerchantId = BAKONG_MERCHANT_ID;
 
     try {
         const { amount, billNumber } = JSON.parse(event.body);
