@@ -2,74 +2,64 @@ const TelegramBot = require('node-telegram-bot-api');
 const { parse } = require('querystring-es3');
 
 exports.handler = async (event) => {
-    const botToken = process.env.TELEGRAM_BOT_TOKEN;
-    const adminChatId = process.env.TELEGRAM_ADMIN_CHAT_ID;
-
-    if (!botToken || !adminChatId) {
-        console.error('FATAL ERROR: Telegram environment variables are not set on Netlify.');
-        return { statusCode: 500, body: JSON.stringify({ message: 'Internal Server Configuration Error.' }) };
-    }
-
-    const bot = new TelegramBot(botToken);
-
     if (event.httpMethod !== 'POST') {
         return { statusCode: 405, body: JSON.stringify({ message: 'Method Not Allowed' }) };
     }
 
+    const { TELEGRAM_BOT_TOKEN, TELEGRAM_ADMIN_CHAT_ID, ABA_PAYMENT_LINK } = process.env;
+
+    if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_ADMIN_CHAT_ID) {
+        return { statusCode: 500, body: JSON.stringify({ message: 'Telegram credentials are not configured.' }) };
+    }
+
+    const bot = new TelegramBot(TELEGRAM_BOT_TOKEN);
+
     try {
         const orderDetails = JSON.parse(event.body);
-        const { customerInfo, items, total, deliveryMethod, paymentMethod, telegramInitData } = orderDetails;
+        const { customerInfo, items, total, deliveryMethod, paymentMethod } = orderDetails;
 
         const orderId = `ORD-${Date.now()}`;
-        let customerTelegramUserId = null, customerUsername = 'N/A', customerFirstName = 'Customer';
+        let customerUsername = 'N/A';
 
-        if (telegramInitData) {
+        if (orderDetails.telegramInitData) {
             try {
-                const user = JSON.parse(parse(telegramInitData).user);
-                customerTelegramUserId = user.id;
+                const user = JSON.parse(parse(orderDetails.telegramInitData).user);
                 customerUsername = user.username || 'N/A';
-                customerFirstName = user.first_name || 'Customer';
             } catch (e) { console.error('Could not parse telegramInitData:', e); }
         }
 
         const formatDeliveryMethod = (method) => ({'in_siem_reap': 'In Siem Reap', 'virak_buntham': 'Virak Buntham', 'j_and_t': 'J&T Express'}[method] || method);
-        const formatPaymentMethod = (method) => ({'cash_on_delivery': 'Cash on Delivery', 'bakong_khqr': 'Bakong (KHQR)'}[method] || method);
+        const formatPaymentMethod = (method) => ({'cash_on_delivery': 'Cash on Delivery', 'aba_payment_link': 'ABA Payment Link'}[method] || method);
 
-        let adminMessage = `🚀 *New Order Received!* 🚀\n\n` +
+        let adminMessageTitle = paymentMethod === 'cash_on_delivery' ? '✅ *New Confirmed Order!* ✅' : '🟡 *New Pending Order!* 🟡';
+        let adminMessageAction = paymentMethod === 'cash_on_delivery' 
+            ? '*Action:* This is a Cash on Delivery order. Please prepare for delivery.'
+            : '*Action:* Please wait for the customer to send a payment screenshot to confirm this order.';
+
+        let adminMessage = `${adminMessageTitle}\n\n` +
                            `*Order ID:* \`${orderId}\`\n` +
-                           `*Customer:* ${customerInfo.name}\n` +
+                           `*Customer:* ${customerInfo.name} (@${customerUsername})\n` +
                            `*Phone:* \`${customerInfo.phone}\`\n` +
-                           `*Address:* ${customerInfo.address}\n` +
-                           (customerTelegramUserId ? `*Telegram ID:* \`${customerTelegramUserId}\` (@${customerUsername})\n` : '') +
+                           `*Address:* ${customerInfo.address}\`\n` +
                            `*Delivery:* ${formatDeliveryMethod(deliveryMethod)}\n` +
                            `*Payment:* ${formatPaymentMethod(paymentMethod)}\n\n` +
                            `*Items:*\n` +
                            items.map(item => `- ${item.name} x ${item.quantity} ($${item.price.toFixed(2)})`).join('\n') +
-                           `\n\n*Total:* \`$${total.toFixed(2)}\``;
+                           `\n\n*Total:* \`$${total.toFixed(2)}\`\n\n` +
+                           `${adminMessageAction}`;
 
-        await bot.sendMessage(adminChatId, adminMessage, { parse_mode: 'Markdown' });
+        await bot.sendMessage(TELEGRAM_ADMIN_CHAT_ID, adminMessage, { parse_mode: 'Markdown' });
 
-        if (customerTelegramUserId) {
-            let userInvoiceMessage = `🧾 *Your Order Confirmation* 🧾\n\n` +
-                                     `Hello ${customerFirstName}, your order (#\`${orderId}\`) is confirmed.\n\n` +
-                                     `*Summary:*\n` +
-                                     items.map(item => `- ${item.name} x ${item.quantity} ($${item.price.toFixed(2)})`).join('\n') +
-                                     `\n\n*Total:* \`$${total.toFixed(2)}\`\n` +
-                                     `*Payment:* ${formatPaymentMethod(paymentMethod)}\n` +
-                                     `*Delivery Address:* ${customerInfo.address}\n\n` +
-                                     `We will contact you shortly. Thank you!`;
-            
-            if (paymentMethod === 'bakong_khqr') {
-                userInvoiceMessage += `\n\nYour payment has been successfully received.`;
-            }
-
-            await bot.sendMessage(customerTelegramUserId, userInvoiceMessage, { parse_mode: 'Markdown' });
-        }
-
-        return { statusCode: 200, body: JSON.stringify({ message: 'Order received!', orderId }) };
+        return {
+            statusCode: 200,
+            body: JSON.stringify({ 
+                message: 'Order notification sent.',
+                paymentLink: ABA_PAYMENT_LINK 
+            }),
+        };
 
     } catch (error) {
         console.error('Error processing order:', error);
-        return { statusCode: 500, body: JSON.stringify({ message: 'Failed to process order.', error: error.message }) };
+        return { statusCode: 500, body: JSON.stringify({ message: 'Failed to process order.' }) };
     }
 };
